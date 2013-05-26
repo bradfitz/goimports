@@ -13,6 +13,7 @@ var tests = []struct {
 	name    string
 	in, out string
 }{
+	// Adding an import to an existing parenthesized import
 	{
 		name: "factored_imports_add",
 		in: `package foo
@@ -38,6 +39,7 @@ func bar() {
 `,
 	},
 
+	// Adding a new import line, without parens
 	{
 		name: "add_import_section",
 		in: `package foo
@@ -55,6 +57,7 @@ func bar() {
 `,
 	},
 
+	// Adding two new imports, which should make a parenthesized import decl.
 	{
 		name: "add_import_paren_section",
 		in: `package foo
@@ -75,6 +78,7 @@ func bar() {
 `,
 	},
 
+	// Make sure we don't add things twice
 	{
 		name: "no_double_add",
 		in: `package foo
@@ -88,6 +92,65 @@ import "bytes"
 
 func bar() {
 	_, _ := bytes.Buffer, bytes.NewReader
+}
+`,
+	},
+
+	// Remove unused imports, 1 of a factored block
+	{
+		name: "remove_unused_1_of_2",
+		in: `package foo
+import (
+"bytes"
+"fmt"
+)
+
+func bar() {
+_, _ := bytes.Buffer, bytes.NewReader
+}
+`,
+		out: `package foo
+
+import "bytes"
+
+func bar() {
+	_, _ := bytes.Buffer, bytes.NewReader
+}
+`,
+	},
+
+	// Remove unused imports, 2 of 2
+	{
+		name: "remove_unused_2_of_2",
+		in: `package foo
+import (
+"bytes"
+"fmt"
+)
+
+func bar() {
+}
+`,
+		out: `package foo
+
+func bar() {
+}
+`,
+	},
+
+	// Remove unused imports, 1 of 1
+	{
+		name: "remove_unused_1_of_1",
+		in: `package foo
+
+import "fmt"
+
+func bar() {
+}
+`,
+		out: `package foo
+
+func bar() {
 }
 `,
 	},
