@@ -1,0 +1,23 @@
+This tool updates your Go imports, adding missing ones and removing
+unreferenced onces.
+
+It's a fork of gofmt, and will also fmt your code, so it can be used
+as a replacement for your gofmt-on-save hook in your editor.
+
+Caveats:
+
+For adding, it currently only knows about the standard library. There
+is not yet support for searching/indexing GOPATH or calling out to a
+helper program to look up from "foo.Bar" to the necessary import.
+
+For removal, it assumes the import path base matches the package name,
+which is best practice anyway, like:
+
+    import "github.com/you/foo" // assumes to import package "foo"
+
+If they don't match, explictly name the package name in your import
+line:
+
+    import foo "github.com/you/not-quite-foo"
+
+These caveats might be fixed.
