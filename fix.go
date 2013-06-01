@@ -51,7 +51,9 @@ func fixImports(f *ast.File) {
 			}
 		case *ast.ImportSpec:
 			if v.Name != nil {
-				declShort[v.Name.Name] = v
+				if v.Name.Name != "." && v.Name.Name != "_" {
+					declShort[v.Name.Name] = v
+				}
 			} else {
 				local := path.Base(strings.Trim(v.Path.Value, `\"`))
 				declShort[local] = v

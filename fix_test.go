@@ -154,6 +154,48 @@ func bar() {
 }
 `,
 	},
+
+	// Never remove dot-imports
+	{
+		name: "untouched_dot_import",
+		in: `package foo
+
+import . "fmt"
+import . "math"
+
+func bar() {
+}
+`,
+		out: `package foo
+
+import . "fmt"
+import . "math"
+
+func bar() {
+}
+`,
+	},
+
+	// Never remove blank imports
+	{
+		name: "untouched_blank_import",
+		in: `package foo
+
+import _ "fmt"
+import _ "math"
+
+func bar() {
+}
+`,
+		out: `package foo
+
+import _ "fmt"
+import _ "math"
+
+func bar() {
+}
+`,
+	},
 }
 
 func TestFixImports(t *testing.T) {
