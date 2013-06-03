@@ -154,6 +154,36 @@ func bar() {
 }
 `,
 	},
+
+	// Add to first import group
+	{
+		name: "first_group",
+		in: `package foo
+
+import (
+	"fmt"
+
+	"bytes"
+)
+
+func bar() {
+	_, _, _ = fmt.Println, bytes.Buffer, math.Pow
+}
+`,
+		out: `package foo
+
+import (
+	"math"
+	"fmt"
+
+	"bytes"
+)
+
+func bar() {
+	_, _, _ = fmt.Println, bytes.Buffer, math.Pow
+}
+`,
+	},
 }
 
 func TestFixImports(t *testing.T) {
