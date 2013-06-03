@@ -30,7 +30,11 @@ func fixImports(f *ast.File) {
 			f.Imports = append(f.Imports, is)
 		}
 		gd0 := genDecls[0]
-		gd0.Specs = append(gd0.Specs, is)
+		// prepend the spec to the beginning of the list
+		gd0.Specs = append(gd0.Specs, nil)
+		copy(gd0.Specs[1:], gd0.Specs)
+		gd0.Specs[0] = is
+
 		if len(gd0.Specs) > 1 && gd0.Lparen == 0 {
 			gd0.Lparen = 1 // something not zero
 		}
