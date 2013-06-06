@@ -39,6 +39,39 @@ func bar() {
 `,
 	},
 
+	// Adding an import to an existing parenthesized import,
+	// verifying it goes into the first section.
+	{
+		name: "factored_imports_add_first_sec",
+		in: `package foo
+import (
+  "fmt"
+
+  "appengine"
+)
+func bar() {
+var b bytes.Buffer
+_ = appengine.IsDevServer
+fmt.Println(b.String())
+}
+`,
+		out: `package foo
+
+import (
+	"bytes"
+	"fmt"
+
+	"appengine"
+)
+
+func bar() {
+	var b bytes.Buffer
+	_ = appengine.IsDevServer
+	fmt.Println(b.String())
+}
+`,
+	},
+
 	// Adding a new import line, without parens
 	{
 		name: "add_import_section",
