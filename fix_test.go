@@ -187,6 +187,24 @@ func bar() {
 }
 `,
 	},
+
+	// Don't remove empty imports.
+	{
+		name: "dont_remove_empty_imports",
+		in: `package foo
+import (
+_ "image/png"
+_ "image/jpeg"
+)
+`,
+		out: `package foo
+
+import (
+	_ "image/jpeg"
+	_ "image/png"
+)
+`,
+	},
 }
 
 func TestFixImports(t *testing.T) {
