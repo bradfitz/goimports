@@ -72,6 +72,39 @@ func bar() {
 `,
 	},
 
+	// Adding an import to an existing parenthesized import,
+	// verifying it goes into the first section. (test 2)
+	{
+		name: "factored_imports_add_first_sec_2",
+		in: `package foo
+import (
+  "fmt"
+
+  "appengine"
+)
+func bar() {
+_ = math.NaN
+_ = fmt.Sprintf
+_ = appengine.IsDevServer
+}
+`,
+		out: `package foo
+
+import (
+	"fmt"
+	"math"
+
+	"appengine"
+)
+
+func bar() {
+	_ = math.NaN
+	_ = fmt.Sprintf
+	_ = appengine.IsDevServer
+}
+`,
+	},
+
 	// Adding a new import line, without parens
 	{
 		name: "add_import_section",

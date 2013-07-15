@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/printer"
 	"go/scanner"
@@ -92,7 +93,7 @@ func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error
 	ast.SortImports(fileSet, file)
 
 	var buf bytes.Buffer
-	err = (&printer.Config{Mode: printerMode, Tabwidth: 8}).Fprint(&buf, fileSet, file)
+	err = format.Node(&buf, fileSet, file)
 	if err != nil {
 		return err
 	}
