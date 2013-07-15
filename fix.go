@@ -81,7 +81,7 @@ func fixImports(f *ast.File) {
 	// Nil out any unused ImportSpecs, to be removed in following passes
 	unusedImport := map[*ast.ImportSpec]bool{}
 	for pkg, is := range declShort {
-		if !usedShort[pkg] && pkg != "_" {
+		if !usedShort[pkg] && pkg != "_" && pkg != "." {
 			unusedImport[is] = true
 		}
 	}

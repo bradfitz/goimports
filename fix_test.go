@@ -205,6 +205,24 @@ import (
 )
 `,
 	},
+
+	// Don't remove dot imports.
+	{
+		name: "dont_remove_dot_imports",
+		in: `package foo
+import (
+. "foo"
+. "bar"
+)
+`,
+		out: `package foo
+
+import (
+	. "bar"
+	. "foo"
+)
+`,
+	},
 }
 
 func TestFixImports(t *testing.T) {
