@@ -256,6 +256,27 @@ import (
 )
 `,
 	},
+
+	// Skip refs the parser can resolve.
+	{
+		name: "skip_resolved_refs",
+		in: `package foo
+
+func f() {
+	type t struct{ Println func(string) }
+	fmt := t{Println: func(string) {}}
+	fmt.Println("foo")
+}
+`,
+		out: `package foo
+
+func f() {
+	type t struct{ Println func(string) }
+	fmt := t{Println: func(string) {}}
+	fmt.Println("foo")
+}
+`,
+	},
 }
 
 func TestFixImports(t *testing.T) {

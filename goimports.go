@@ -88,7 +88,9 @@ func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error
 		return err
 	}
 
-	fixImports(file)
+	if err := fixImports(file); err != nil {
+		return err
+	}
 
 	ast.SortImports(fileSet, file)
 
