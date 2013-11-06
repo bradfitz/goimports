@@ -8,10 +8,54 @@ import (
 	"strings"
 )
 
-func fixImports(f *ast.File) {
-	declShort := map[string]*ast.ImportSpec{} // key: either base package "fmt", "http" or renamed package
-	usedShort := map[string]bool{}            // Same key
+func fixImports(f *ast.File) error {
+	// refs are a set of possible package references currently unsatisified by imports.
+	// first key: either base package (e.g. "fmt") or renamed package
+	// second key: referenced package symbol (e.g. "Println")
+	refs := make(map[string]map[string]bool)
+
+	// decls are the current package imports. key is base package or renamed package.
+	decls := make(map[string]*ast.ImportSpec)
 	var genDecls []*ast.GenDecl
+
+	// collect potential uses of packages.
+	var visitor visitFn
+	visitor = visitFn(func(node ast.Node) ast.Visitor {
+		if node == nil {
+			return visitor
+		}
+		switch v := node.(type) {
+		case *ast.GenDecl:
+			if v.Tok == token.IMPORT {
+				genDecls = append(genDecls, v)
+			}
+		case *ast.ImportSpec:
+			if v.Name != nil {
+				decls[v.Name.Name] = v
+			} else {
+				local := path.Base(strings.Trim(v.Path.Value, `\"`))
+				decls[local] = v
+			}
+		case *ast.SelectorExpr:
+			xident, ok := v.X.(*ast.Ident)
+			if !ok {
+				break
+			}
+			if xident.Obj != nil {
+				// if the parser can resolve it, it's not a package ref
+				break
+			}
+			pkgName := xident.Name
+			if refs[pkgName] == nil {
+				refs[pkgName] = make(map[string]bool)
+			}
+			if decls[pkgName] == nil {
+				refs[pkgName][v.Sel.Name] = true
+			}
+		}
+		return visitor
+	})
+	ast.Walk(visitor, f)
 
 	addImport := func(ipath string) {
 		is := &ast.ImportSpec{
@@ -20,7 +64,7 @@ func fixImports(f *ast.File) {
 				Value: strconv.Quote(ipath),
 			},
 		}
-		declShort[path.Base(ipath)] = is
+		decls[path.Base(ipath)] = is
 
 		if len(genDecls) == 0 {
 			genDecls = append(genDecls, &ast.GenDecl{
@@ -41,47 +85,21 @@ func fixImports(f *ast.File) {
 		}
 	}
 
-	var visitor visitFn
-	depth := 0
-	visitor = visitFn(func(node ast.Node) ast.Visitor {
-		if node == nil {
-			depth--
-			return visitor
+	// Search for imports matching potential package references.
+	for pkgName, symbols := range refs {
+		fullImport, err := findImport(pkgName, symbols)
+		if err != nil {
+			return err
 		}
-		depth++
-		switch v := node.(type) {
-		case *ast.GenDecl:
-			if v.Tok == token.IMPORT {
-				genDecls = append(genDecls, v)
-			}
-		case *ast.ImportSpec:
-			if v.Name != nil {
-				declShort[v.Name.Name] = v
-			} else {
-				local := path.Base(strings.Trim(v.Path.Value, `\"`))
-				declShort[local] = v
-			}
-		case *ast.SelectorExpr:
-			if xident, ok := v.X.(*ast.Ident); ok {
-				pkgName := xident.Name
-				usedShort[pkgName] = true
-				if declShort[pkgName] == nil {
-					key := pkgName + "." + v.Sel.Name
-					if fullImport, ok := common[key]; ok {
-						addImport(fullImport)
-					}
-				}
-			}
+		if fullImport != "" {
+			addImport(fullImport)
 		}
-		// fmt.Printf("%ssaw a %T\n", indent, node)
-		return visitor
-	})
-	ast.Walk(visitor, f)
+	}
 
 	// Nil out any unused ImportSpecs, to be removed in following passes
 	unusedImport := map[*ast.ImportSpec]bool{}
-	for pkg, is := range declShort {
-		if !usedShort[pkg] && pkg != "_" && pkg != "." {
+	for pkg, is := range decls {
+		if refs[pkg] == nil && pkg != "_" && pkg != "." {
 			unusedImport[is] = true
 		}
 	}
@@ -95,6 +113,21 @@ func fixImports(f *ast.File) {
 
 	f.Decls = filterEmptyDecls(f.Decls)
 	f.Imports = filterUnusedImports(unusedImport, f.Imports)
+	return nil
+}
+
+// findImport searches for a package with the given symbols.
+// If no package is found, findImport returns "".
+// Declared as a variable rather than a function so goimports can be easily
+// extended by adding a file with an init function.
+var findImport = func(pkgName string, symbols map[string]bool) (string, error) {
+	// TODO(crawshaw): Walk GOPATH, use the parser to match symbols.
+	var sym string
+	for k := range symbols {
+		sym = k
+		break
+	}
+	return common[pkgName + "." + sym], nil
 }
 
 func filterUnusedSpecs(unused map[*ast.ImportSpec]bool, in []ast.Spec) (out []ast.Spec) {
