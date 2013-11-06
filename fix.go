@@ -2,10 +2,10 @@ package main
 
 import (
 	"go/ast"
-	"go/token"
 	"path"
-	"strconv"
 	"strings"
+
+	"code.google.com/p/go.tools/astutil"
 )
 
 func fixImports(f *ast.File) error {
@@ -16,7 +16,6 @@ func fixImports(f *ast.File) error {
 
 	// decls are the current package imports. key is base package or renamed package.
 	decls := make(map[string]*ast.ImportSpec)
-	var genDecls []*ast.GenDecl
 
 	// collect potential uses of packages.
 	var visitor visitFn
@@ -25,10 +24,6 @@ func fixImports(f *ast.File) error {
 			return visitor
 		}
 		switch v := node.(type) {
-		case *ast.GenDecl:
-			if v.Tok == token.IMPORT {
-				genDecls = append(genDecls, v)
-			}
 		case *ast.ImportSpec:
 			if v.Name != nil {
 				decls[v.Name.Name] = v
@@ -57,62 +52,28 @@ func fixImports(f *ast.File) error {
 	})
 	ast.Walk(visitor, f)
 
-	addImport := func(ipath string) {
-		is := &ast.ImportSpec{
-			Path: &ast.BasicLit{
-				Kind:  token.STRING,
-				Value: strconv.Quote(ipath),
-			},
-		}
-		decls[path.Base(ipath)] = is
-
-		if len(genDecls) == 0 {
-			genDecls = append(genDecls, &ast.GenDecl{
-				Tok: token.IMPORT,
-			})
-			f.Decls = append([]ast.Decl{genDecls[0]}, f.Decls...)
-			f.Imports = append(f.Imports, is)
-		}
-		gd0 := genDecls[0]
-		// Prepend onto gd0.Specs:
-		// Make room for it (nil), slide everything down, then set [0].
-		gd0.Specs = append(gd0.Specs, nil)
-		copy(gd0.Specs[1:], gd0.Specs[:])
-		gd0.Specs[0] = is
-
-		if len(gd0.Specs) > 1 && gd0.Lparen == 0 {
-			gd0.Lparen = 1 // something not zero
-		}
-	}
-
 	// Search for imports matching potential package references.
 	for pkgName, symbols := range refs {
-		fullImport, err := findImport(pkgName, symbols)
+		ipath, err := findImport(pkgName, symbols)
 		if err != nil {
 			return err
 		}
-		if fullImport != "" {
-			addImport(fullImport)
+		if ipath != "" {
+			astutil.AddImport(f, ipath)
 		}
 	}
 
 	// Nil out any unused ImportSpecs, to be removed in following passes
-	unusedImport := map[*ast.ImportSpec]bool{}
+	unusedImport := map[string]bool{}
 	for pkg, is := range decls {
 		if refs[pkg] == nil && pkg != "_" && pkg != "." {
-			unusedImport[is] = true
+			unusedImport[strings.Trim(is.Path.Value, `"`)] = true
 		}
 	}
-
-	for _, gd := range genDecls {
-		gd.Specs = filterUnusedSpecs(unusedImport, gd.Specs)
-		if len(gd.Specs) == 1 {
-			gd.Lparen = 0
-		}
+	for ipath := range unusedImport {
+		astutil.DeleteImport(f, ipath)
 	}
 
-	f.Decls = filterEmptyDecls(f.Decls)
-	f.Imports = filterUnusedImports(unusedImport, f.Imports)
 	return nil
 }
 
@@ -128,36 +89,6 @@ var findImport = func(pkgName string, symbols map[string]bool) (string, error) {
 		break
 	}
 	return common[pkgName + "." + sym], nil
-}
-
-func filterUnusedSpecs(unused map[*ast.ImportSpec]bool, in []ast.Spec) (out []ast.Spec) {
-	for _, spec := range in {
-		if is, ok := spec.(*ast.ImportSpec); ok && unused[is] {
-			continue
-		}
-		out = append(out, spec)
-	}
-	return
-}
-
-func filterUnusedImports(unused map[*ast.ImportSpec]bool, in []*ast.ImportSpec) (out []*ast.ImportSpec) {
-	for _, spec := range in {
-		if unused[spec] {
-			continue
-		}
-		out = append(out, spec)
-	}
-	return
-}
-
-func filterEmptyDecls(in []ast.Decl) (out []ast.Decl) {
-	for _, decl := range in {
-		if gd, ok := decl.(*ast.GenDecl); ok && gd.Tok == token.IMPORT && len(gd.Specs) == 0 {
-			continue
-		}
-		out = append(out, decl)
-	}
-	return
 }
 
 type visitFn func(node ast.Node) ast.Visitor
