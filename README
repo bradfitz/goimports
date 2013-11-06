@@ -1,5 +1,5 @@
 This tool updates your Go imports, adding missing ones and removing
-unreferenced onces.
+unreferenced ones.
 
 It's a fork of gofmt, and will also fmt your code, so it can be used
 as a replacement for your gofmt-on-save hook in your editor.
