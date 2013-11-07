@@ -6,10 +6,6 @@ as a replacement for your gofmt-on-save hook in your editor.
 
 Caveats:
 
-For adding, it currently only knows about the standard library. There
-is not yet support for searching/indexing GOPATH or calling out to a
-helper program to look up from "foo.Bar" to the necessary import.
-
 For removal, it assumes the import path base matches the package name,
 which is best practice anyway, like:
 
