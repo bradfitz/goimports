@@ -277,6 +277,23 @@ func f() {
 }
 `,
 	},
+
+	// Do not add a package we already have a resolution for.
+	{
+		name: "skip_template",
+		in: `package foo
+
+import "html/template"
+
+func f() { t = template.New("sometemplate") }
+`,
+		out: `package foo
+
+import "html/template"
+
+func f() { t = template.New("sometemplate") }
+`,
+	},
 }
 
 func TestFixImports(t *testing.T) {
