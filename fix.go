@@ -166,6 +166,9 @@ func loadPkg(wg *sync.WaitGroup, root, importpath string) {
 		return
 	}
 	for _, child := range children {
+		if strings.HasPrefix(child.Name(), ".") {
+			continue
+		}
 		if child.IsDir() {
 			wg.Add(1)
 			go func(root, name string) {
