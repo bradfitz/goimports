@@ -294,6 +294,25 @@ import "html/template"
 func f() { t = template.New("sometemplate") }
 `,
 	},
+
+	// Don't touch cgo
+	{
+		name: "cgo",
+		in: `package foo
+
+/*
+#include <foo.h>
+*/
+import "C"
+`,
+		out: `package foo
+
+/*
+#include <foo.h>
+*/
+import "C"
+`,
+	},
 }
 
 func TestFixImports(t *testing.T) {

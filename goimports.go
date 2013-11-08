@@ -20,6 +20,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 var (
@@ -31,10 +32,12 @@ var (
 )
 
 var (
-	fileSet     = token.NewFileSet() // per process FileSet
-	exitCode    = 0
-	parserMode  parser.Mode
-	printerMode printer.Mode
+	fileSet  = token.NewFileSet() // per process FileSet
+	exitCode = 0
+
+	initModesOnce sync.Once // guards calling initModes
+	parserMode    parser.Mode
+	printerMode   printer.Mode
 )
 
 func report(err error) {
@@ -46,6 +49,11 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "usage: goimports [flags] [path ...]\n")
 	flag.PrintDefaults()
 	os.Exit(2)
+}
+
+func initModes() {
+	initParserMode()
+	initPrinterMode()
 }
 
 func initParserMode() {
@@ -69,6 +77,8 @@ func isGoFile(f os.FileInfo) bool {
 
 // If in == nil, the source is the contents of the file with the given filename.
 func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error {
+	initModesOnce.Do(initModes)
+
 	if in == nil {
 		f, err := os.Open(filename)
 		if err != nil {
@@ -157,9 +167,6 @@ func main() {
 func gofmtMain() {
 	flag.Usage = usage
 	flag.Parse()
-
-	initParserMode()
-	initPrinterMode()
 
 	if flag.NArg() == 0 {
 		if err := processFile("<standard input>", os.Stdin, os.Stdout, true); err != nil {

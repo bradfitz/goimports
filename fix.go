@@ -94,6 +94,10 @@ func fixImports(f *ast.File) error {
 		}
 	}
 	for ipath := range unusedImport {
+		if ipath == "C" {
+			// Don't remove cgo stuff.
+			continue
+		}
 		astutil.DeleteImport(f, ipath)
 	}
 
