@@ -60,16 +60,29 @@ func fixImports(f *ast.File) error {
 	ast.Walk(visitor, f)
 
 	// Search for imports matching potential package references.
+	searches := 0
+	type result struct {
+		ipath string
+		err error
+	}
+	results := make(chan result)
 	for pkgName, symbols := range refs {
 		if len(symbols) == 0 {
 			continue // skip over packages already imported
 		}
-		ipath, err := findImport(pkgName, symbols)
-		if err != nil {
-			return err
+		go func(pkgName string, symbols map[string]bool) {
+			ipath, err := findImport(pkgName, symbols)
+			results <- result{ ipath, err }
+		}(pkgName, symbols)
+		searches++
+	}
+	for i := 0; i < searches; i++ {
+		result := <-results
+		if result.err != nil {
+			return result.err
 		}
-		if ipath != "" {
-			astutil.AddImport(f, ipath)
+		if result.ipath != "" {
+			astutil.AddImport(f, result.ipath)
 		}
 	}
 
