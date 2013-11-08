@@ -239,10 +239,20 @@ var findImport = func(pkgName string, symbols map[string]bool) (string, error) {
 			}
 		}
 	}
-	for importpath := range pkgs {
-		return importpath, nil
+	if len(pkgs) == 0 {
+		return "", nil
 	}
-	return "", nil
+
+	// If there are multiple candidate packages, the shortest one wins.
+	// This is a heuristic to prefer the standard library (e.g. "bytes")
+	// over e.g. "github.com/foo/bar/bytes".
+	shortest := ""
+	for importPath := range pkgs {
+		if shortest == "" || len(importPath) < len(shortest) {
+			shortest = importPath
+		}
+	}
+	return shortest, nil
 }
 
 type visitFn func(node ast.Node) ast.Visitor
