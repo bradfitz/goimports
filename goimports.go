@@ -5,11 +5,11 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"flag"
 	"fmt"
 	"go/ast"
-	"go/format"
 	"go/parser"
 	"go/printer"
 	"go/scanner"
@@ -19,8 +19,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
+
+	"code.google.com/p/go.tools/astutil"
 )
 
 var (
@@ -98,20 +102,40 @@ func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error
 		return err
 	}
 
-	if err := fixImports(file); err != nil {
+	added, err := fixImports(file)
+	if err != nil {
 		return err
 	}
 
-	ast.SortImports(fileSet, file)
+	sortImports(fileSet, file)
+	imps := astutil.Imports(fileSet, file)
+
+	var spacesBefore []string // import paths we need spaces before
+	if len(imps) == 1 && len(added) > 0 {
+		// We have just one block of imports. See if any are in different groups numbers.
+		lastGroup := -1
+		for _, importSpec := range imps[0] {
+			importPath, _ := strconv.Unquote(importSpec.Path.Value)
+			groupNum := importGroup(importPath)
+			if groupNum != lastGroup && lastGroup != -1 {
+				spacesBefore = append(spacesBefore, importPath)
+			}
+			lastGroup = groupNum
+		}
+
+	}
 
 	var buf bytes.Buffer
-	err = format.Node(&buf, fileSet, file)
+	err = (&printer.Config{Mode: printerMode, Tabwidth: 8}).Fprint(&buf, fileSet, file)
 	if err != nil {
 		return err
 	}
 	res := buf.Bytes()
 	if adjust != nil {
 		res = adjust(src, res)
+	}
+	if len(spacesBefore) > 0 {
+		res = addImportSpaces(bytes.NewReader(res), spacesBefore)
 	}
 
 	if !bytes.Equal(src, res) {
@@ -324,4 +348,38 @@ func matchSpace(orig []byte, src []byte) []byte {
 	}
 	b.Write(after)
 	return b.Bytes()
+}
+
+var impLine = regexp.MustCompile(`^\s+(?:\w+\s+)?"(.+)"`)
+
+func addImportSpaces(r io.Reader, breaks []string) []byte {
+	var out bytes.Buffer
+	sc := bufio.NewScanner(r)
+	inImports := false
+	done := false
+	for sc.Scan() {
+		s := sc.Text()
+
+		if !inImports && !done && strings.HasPrefix(s, "import") {
+			inImports = true
+		}
+		if inImports && (strings.HasPrefix(s, "var") ||
+			strings.HasPrefix(s, "func") ||
+			strings.HasPrefix(s, "const") ||
+			strings.HasPrefix(s, "type")) {
+			done = true
+			inImports = false
+		}
+		if inImports && len(breaks) > 0 {
+			if m := impLine.FindStringSubmatch(s); m != nil {
+				if m[1] == string(breaks[0]) {
+					out.WriteByte('\n')
+					breaks = breaks[1:]
+				}
+			}
+		}
+
+		fmt.Fprintln(&out, s)
+	}
+	return out.Bytes()
 }

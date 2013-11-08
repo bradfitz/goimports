@@ -15,7 +15,33 @@ import (
 	"code.google.com/p/go.tools/astutil"
 )
 
-func fixImports(f *ast.File) error {
+// importToGroup is a list of functions which map from an import path to
+// a group number.
+var importToGroup = []func(importPath string) (num int, ok bool){
+	func(importPath string) (num int, ok bool) {
+		if strings.HasPrefix(importPath, "appengine") {
+			return 2, true
+		}
+		return
+	},
+	func(importPath string) (num int, ok bool) {
+		if strings.Contains(importPath, ".") {
+			return 1, true
+		}
+		return
+	},
+}
+
+func importGroup(importPath string) int {
+	for _, fn := range importToGroup {
+		if n, ok := fn(importPath); ok {
+			return n
+		}
+	}
+	return 0
+}
+
+func fixImports(f *ast.File) (added []string, err error) {
 	// refs are a set of possible package references currently unsatisified by imports.
 	// first key: either base package (e.g. "fmt") or renamed package
 	// second key: referenced package symbol (e.g. "Println")
@@ -79,10 +105,11 @@ func fixImports(f *ast.File) error {
 	for i := 0; i < searches; i++ {
 		result := <-results
 		if result.err != nil {
-			return result.err
+			return nil, result.err
 		}
 		if result.ipath != "" {
 			astutil.AddImport(f, result.ipath)
+			added = append(added, result.ipath)
 		}
 	}
 
@@ -101,7 +128,7 @@ func fixImports(f *ast.File) error {
 		astutil.DeleteImport(f, ipath)
 	}
 
-	return nil
+	return added, nil
 }
 
 type pkg struct {
@@ -213,7 +240,10 @@ func loadExports(dir string) map[string]bool {
 // If no package is found, findImport returns "".
 // Declared as a variable rather than a function so goimports can be easily
 // extended by adding a file with an init function.
-var findImport = func(pkgName string, symbols map[string]bool) (string, error) {
+var findImport = findImportGoPath
+
+func findImportGoPath(pkgName string, symbols map[string]bool) (string, error) {
+
 	pkgIndexOnce.Do(loadPkgIndex)
 
 	// Collect exports for packages with matching names.

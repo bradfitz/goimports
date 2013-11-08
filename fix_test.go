@@ -10,8 +10,9 @@ import (
 var only = flag.String("only", "", "If non-empty, the fix test to run")
 
 var tests = []struct {
-	name    string
-	in, out string
+	name       string
+	in, out    string
+	findImport func(pkgName string, symbols map[string]bool) (string, error)
 }{
 	// Adding an import to an existing parenthesized import
 	{
@@ -313,12 +314,58 @@ import "C"
 import "C"
 `,
 	},
+
+	// Put some things in their own section
+	{
+		name: "make_sections",
+		findImport: func(pkgName string, symbols map[string]bool) (string, error) {
+			switch pkgName {
+			case "appengine":
+				return "appengine", nil
+			case "user":
+				return "appengine/user", nil
+			case "fmt":
+				return pkgName, nil
+			}
+			return "", nil
+		},
+		in: `package foo
+
+import (
+"os"
+)
+
+func foo () {
+_, _ = os.Args, fmt.Println
+_, _ = appengine.FooSomething, user.Current
+}
+`,
+		out: `package foo
+
+import (
+	"fmt"
+	"os"
+
+	"appengine"
+	"appengine/user"
+)
+
+func foo() {
+	_, _ = os.Args, fmt.Println
+	_, _ = appengine.FooSomething, user.Current
+}
+`,
+	},
 }
 
 func TestFixImports(t *testing.T) {
 	for _, tt := range tests {
 		if *only != "" && tt.name != *only {
 			continue
+		}
+		findImport = findImportGoPath
+		if tt.findImport != nil {
+			findImport = tt.findImport
 		}
 		var buf bytes.Buffer
 		err := processFile("foo.go", strings.NewReader(tt.in), &buf, false)
