@@ -184,6 +184,9 @@ func loadExports(dir string) map[string]bool {
 	exports := make(map[string]bool)
 	buildPkg, err := build.ImportDir(dir, 0)
 	if err != nil {
+		if strings.Contains(err.Error(), "no buildable Go source files in") {
+			return nil
+		}
 		fmt.Fprintf(os.Stderr, "could not import %q: %v", dir, err)
 		return nil
 	}
