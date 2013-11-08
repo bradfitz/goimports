@@ -63,7 +63,7 @@ func fixImports(f *ast.File) error {
 	searches := 0
 	type result struct {
 		ipath string
-		err error
+		err   error
 	}
 	results := make(chan result)
 	for pkgName, symbols := range refs {
@@ -72,7 +72,7 @@ func fixImports(f *ast.File) error {
 		}
 		go func(pkgName string, symbols map[string]bool) {
 			ipath, err := findImport(pkgName, symbols)
-			results <- result{ ipath, err }
+			results <- result{ipath, err}
 		}(pkgName, symbols)
 		searches++
 	}
