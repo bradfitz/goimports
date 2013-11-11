@@ -348,6 +348,39 @@ func foo() {
 }
 `,
 	},
+
+	// Delete existing empty import block
+	{
+		name: "delete_empty_import_block",
+		in: `package foo
+
+import ()
+`,
+		out: `package foo
+`,
+	},
+
+	// Use existing empty import block
+	{
+		name: "use_empty_import_block",
+		in: `package foo
+
+import ()
+
+func f() {
+	_ = fmt.Println
+}
+`,
+		out: `package foo
+
+import "fmt"
+
+func f() {
+	_ = fmt.Println
+}
+`,
+	},
+
 }
 
 func TestFixImports(t *testing.T) {
