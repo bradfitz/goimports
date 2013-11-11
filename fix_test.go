@@ -3,6 +3,10 @@ package main
 import (
 	"bytes"
 	"flag"
+	"go/build"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -10,9 +14,8 @@ import (
 var only = flag.String("only", "", "If non-empty, the fix test to run")
 
 var tests = []struct {
-	name       string
-	in, out    string
-	findImport func(pkgName string, symbols map[string]bool) (string, error)
+	name    string
+	in, out string
 }{
 	// Adding an import to an existing parenthesized import
 	{
@@ -318,17 +321,6 @@ import "C"
 	// Put some things in their own section
 	{
 		name: "make_sections",
-		findImport: func(pkgName string, symbols map[string]bool) (string, error) {
-			switch pkgName {
-			case "appengine":
-				return "appengine", nil
-			case "user":
-				return "appengine/user", nil
-			case "fmt":
-				return pkgName, nil
-			}
-			return "", nil
-		},
 		in: `package foo
 
 import (
@@ -359,13 +351,22 @@ func foo() {
 }
 
 func TestFixImports(t *testing.T) {
+	simplePkgs := map[string]string{
+		"fmt":       "fmt",
+		"os":        "os",
+		"math":      "math",
+		"appengine": "appengine",
+		"user":      "appengine/user",
+		"zip":       "archive/zip",
+		"bytes":     "bytes",
+	}
+	findImport = func(pkgName string, symbols map[string]bool) (string, error) {
+		return simplePkgs[pkgName], nil
+	}
+
 	for _, tt := range tests {
 		if *only != "" && tt.name != *only {
 			continue
-		}
-		findImport = findImportGoPath
-		if tt.findImport != nil {
-			findImport = tt.findImport
 		}
 		var buf bytes.Buffer
 		err := processFile("foo.go", strings.NewReader(tt.in), &buf, false)
@@ -376,5 +377,49 @@ func TestFixImports(t *testing.T) {
 		if got := buf.String(); got != tt.out {
 			t.Errorf("results diff on %q\nGOT:\n%s\nWANT:\n%s\n", tt.name, got, tt.out)
 		}
+	}
+}
+
+func TestFindImportGoPath(t *testing.T) {
+	goroot, err := ioutil.TempDir("", "goimports-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(goroot)
+	bytesDir := filepath.Join(goroot, "src", "pkg", "bytes")
+	if err := os.MkdirAll(bytesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	bytesSrcPath := filepath.Join(bytesDir, "bytes.go")
+	bytesSrc := []byte(`package bytes
+
+type Buffer2 struct {}
+`)
+	if err := ioutil.WriteFile(bytesSrcPath, bytesSrc, 0775); err != nil {
+		t.Fatal(err)
+	}
+	oldGOROOT := build.Default.GOROOT
+	oldGOPATH := build.Default.GOPATH
+	build.Default.GOROOT = goroot
+	build.Default.GOPATH = ""
+	defer func() {
+		build.Default.GOROOT = oldGOROOT
+		build.Default.GOPATH = oldGOPATH
+	}()
+
+	got, err := findImportGoPath("bytes", map[string]bool{"Buffer2": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "bytes" {
+		t.Errorf(`findImportGoPath("bytes", Buffer2 ...)=%q, want "bytes"`, got)
+	}
+
+	got, err = findImportGoPath("bytes", map[string]bool{"Missing": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "" {
+		t.Errorf(`findImportGoPath("bytes", Missing ...)=%q, want ""`, got)
 	}
 }
