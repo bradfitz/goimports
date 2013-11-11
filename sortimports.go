@@ -16,12 +16,17 @@ import (
 // sortImports sorts runs of consecutive import lines in import blocks in f.
 // It also removes duplicate imports when it is possible to do so without data loss.
 func sortImports(fset *token.FileSet, f *ast.File) {
-	for _, d := range f.Decls {
+	for i, d := range f.Decls {
 		d, ok := d.(*ast.GenDecl)
 		if !ok || d.Tok != token.IMPORT {
 			// Not an import declaration, so we're done.
 			// Imports are always first.
 			break
+		}
+
+		if len(d.Specs) == 0 {
+			// Empty import block, remove it.
+			f.Decls = append(f.Decls[:i], f.Decls[i+1:]...)
 		}
 
 		if !d.Lparen.IsValid() {
