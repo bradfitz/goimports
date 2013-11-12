@@ -33,6 +33,11 @@ var (
 	write     = flag.Bool("w", false, "write result to (source) file instead of stdout")
 	doDiff    = flag.Bool("d", false, "display diffs instead of rewriting files")
 	allErrors = flag.Bool("e", false, "report all errors (not just the first 10 on different lines)")
+
+	// layout control
+	comments  = flag.Bool("comments", true, "print comments")
+	tabWidth  = flag.Int("tabwidth", 8, "tab width")
+	tabIndent = flag.Bool("tabs", true, "indent with tabs")
 )
 
 var (
@@ -62,7 +67,9 @@ func initModes() {
 
 func initParserMode() {
 	parserMode = parser.Mode(0)
-	parserMode |= parser.ParseComments
+	if *comments {
+		parserMode |= parser.ParseComments
+	}
 	if *allErrors {
 		parserMode |= parser.AllErrors
 	}
@@ -70,7 +77,9 @@ func initParserMode() {
 
 func initPrinterMode() {
 	printerMode = printer.UseSpaces
-	printerMode |= printer.TabIndent
+	if *tabIndent {
+		printerMode |= printer.TabIndent
+	}
 }
 
 func isGoFile(f os.FileInfo) bool {
@@ -126,7 +135,7 @@ func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error
 	}
 
 	var buf bytes.Buffer
-	err = (&printer.Config{Mode: printerMode, Tabwidth: 8}).Fprint(&buf, fileSet, file)
+	err = (&printer.Config{Mode: printerMode, Tabwidth: *tabWidth}).Fprint(&buf, fileSet, file)
 	if err != nil {
 		return err
 	}
@@ -191,6 +200,12 @@ func main() {
 func gofmtMain() {
 	flag.Usage = usage
 	flag.Parse()
+
+	if *tabWidth < 0 {
+		fmt.Fprintf(os.Stderr, "negative tabwidth %d\n", *tabWidth)
+		exitCode = 2
+		return
+	}
 
 	if flag.NArg() == 0 {
 		if err := processFile("<standard input>", os.Stdin, os.Stdout, true); err != nil {
