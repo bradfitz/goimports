@@ -33,7 +33,7 @@ which is best practice anyway, like:
 
     import "github.com/you/foo" // assumes this is package "foo"
 
-If they don't match, explictly name the package name in your import
+If they don't match, explicitly name the package name in your import
 line:
 
     import foo "github.com/you/not-quite-foo"
