@@ -197,7 +197,11 @@ func loadPkg(wg *sync.WaitGroup, root, importpath string) {
 		return
 	}
 	for _, child := range children {
-		if strings.HasPrefix(child.Name(), ".") {
+		name := child.Name()
+		if name == "" {
+			continue
+		}
+		if c := name[0]; c == '.' || ('0' <= c && c <= '9') {
 			continue
 		}
 		if child.IsDir() {
@@ -205,7 +209,7 @@ func loadPkg(wg *sync.WaitGroup, root, importpath string) {
 			go func(root, name string) {
 				defer wg.Done()
 				loadPkg(wg, root, name)
-			}(root, filepath.Join(importpath, child.Name()))
+			}(root, filepath.Join(importpath, name))
 		}
 	}
 }
