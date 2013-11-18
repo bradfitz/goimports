@@ -111,7 +111,7 @@ func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error
 		return err
 	}
 
-	added, err := fixImports(file)
+	_, err = fixImports(file)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error
 	imps := astutil.Imports(fileSet, file)
 
 	var spacesBefore []string // import paths we need spaces before
-	if len(imps) == 1 && len(added) > 0 {
+	if len(imps) == 1 {
 		// We have just one block of imports. See if any are in different groups numbers.
 		lastGroup := -1
 		for _, importSpec := range imps[0] {

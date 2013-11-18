@@ -381,6 +381,73 @@ func f() {
 `,
 	},
 
+	// Blank line before adding new section.
+	{
+		name: "blank_line_before_new_group",
+		in: `package foo
+
+import (
+	"fmt"
+	"net"
+)
+
+func f() {
+	_ = net.Dial
+	_ = fmt.Printf
+	_ = snappy.Foo
+}
+`,
+		out: `package foo
+
+import (
+	"fmt"
+	"net"
+
+	"code.google.com/p/snappy-go/snappy"
+)
+
+func f() {
+	_ = net.Dial
+	_ = fmt.Printf
+	_ = snappy.Foo
+}
+`,
+	},
+
+	// Blank line between standard library and third-party stuff.
+	{
+		name: "blank_line_separating_std_and_third_party",
+		in: `package foo
+
+import (
+	"code.google.com/p/snappy-go/snappy"
+	"fmt"
+	"net"
+)
+
+func f() {
+	_ = net.Dial
+	_ = fmt.Printf
+	_ = snappy.Foo
+}
+`,
+		out: `package foo
+
+import (
+	"fmt"
+	"net"
+
+	"code.google.com/p/snappy-go/snappy"
+)
+
+func f() {
+	_ = net.Dial
+	_ = fmt.Printf
+	_ = snappy.Foo
+}
+`,
+	},
+
 }
 
 func TestFixImports(t *testing.T) {
@@ -392,6 +459,7 @@ func TestFixImports(t *testing.T) {
 		"user":      "appengine/user",
 		"zip":       "archive/zip",
 		"bytes":     "bytes",
+		"snappy": "code.google.com/p/snappy-go/snappy",
 	}
 	findImport = func(pkgName string, symbols map[string]bool) (string, error) {
 		return simplePkgs[pkgName], nil
