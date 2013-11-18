@@ -20,6 +20,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -190,6 +191,8 @@ func walkDir(path string) {
 }
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	// call gofmtMain in a separate function
 	// so that it can use defer and have them
 	// run before the exit.
