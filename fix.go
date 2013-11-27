@@ -215,7 +215,9 @@ func loadPkg(wg *sync.WaitGroup, root, importpath string) {
 }
 
 // loadExports returns a list exports for a package.
-func loadExports(dir string) map[string]bool {
+var loadExports = loadExportsGoPath
+
+func loadExportsGoPath(dir string) map[string]bool {
 	exports := make(map[string]bool)
 	buildPkg, err := build.ImportDir(dir, 0)
 	if err != nil {
