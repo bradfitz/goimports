@@ -25,17 +25,3 @@ For vim, set "gofmt_command" to "goimports":
 For other editors, you probably know what to do.
 
 Happy hacking!
-
-Caveats:
-
-For removal, it assumes the import path base matches the package name,
-which is best practice anyway, like:
-
-    import "github.com/you/foo" // assumes this is package "foo"
-
-If they don't match, explicitly name the package name in your import
-line:
-
-    import foo "github.com/you/not-quite-foo"
-
-These caveats might be fixed.

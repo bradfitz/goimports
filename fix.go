@@ -61,7 +61,7 @@ func fixImports(f *ast.File) (added []string, err error) {
 			if v.Name != nil {
 				decls[v.Name.Name] = v
 			} else {
-				local := path.Base(strings.Trim(v.Path.Value, `\"`))
+				local := importPathToName(strings.Trim(v.Path.Value, `\"`))
 				decls[local] = v
 			}
 		case *ast.SelectorExpr:
@@ -131,6 +131,24 @@ func fixImports(f *ast.File) (added []string, err error) {
 	return added, nil
 }
 
+// importPathToName returns the package name for the given import path.
+var importPathToName = importPathToNameGoPath
+
+// importPathToNameBasic assumes the package name is the base of import path.
+func importPathToNameBasic(importPath string) (packageName string) {
+	return path.Base(importPath)
+}
+
+// importPathToNameGoPath finds out the actual package name, as declared in its .go files.
+// If there's a problem, it falls back to using importPathToNameBasic.
+func importPathToNameGoPath(importPath string) (packageName string) {
+	if buildPkg, err := build.Import(importPath, "", 0); err == nil {
+		return buildPkg.Name
+	} else {
+		return importPathToNameBasic(importPath)
+	}
+}
+
 type pkg struct {
 	importpath string // full pkg import path, e.g. "net/http"
 	dir        string // absolute file path to pkg directory e.g. "/usr/lib/go/src/fmt"
@@ -178,7 +196,7 @@ var fset = token.NewFileSet()
 
 func loadPkg(wg *sync.WaitGroup, root, pkgrelpath string) {
 	importpath := filepath.ToSlash(pkgrelpath)
-	shortName := filepath.Base(importpath)
+	shortName := importPathToName(importpath)
 
 	dir := filepath.Join(root, importpath)
 	pkgIndex.Lock()
