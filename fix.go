@@ -220,7 +220,7 @@ func loadPkg(wg *sync.WaitGroup, root, pkgrelpath string) {
 		if name == "" {
 			continue
 		}
-		if c := name[0]; c == '.' || ('0' <= c && c <= '9') {
+		if c := name[0]; c == '.' {
 			continue
 		}
 		if child.IsDir() {
