@@ -176,8 +176,9 @@ func loadPkgIndex() {
 
 var fset = token.NewFileSet()
 
-func loadPkg(wg *sync.WaitGroup, root, importpath string) {
-	shortName := path.Base(importpath)
+func loadPkg(wg *sync.WaitGroup, root, pkgrelpath string) {
+	importpath := filepath.ToSlash(pkgrelpath)
+	shortName := filepath.Base(importpath)
 
 	dir := filepath.Join(root, importpath)
 	pkgIndex.Lock()

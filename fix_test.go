@@ -447,7 +447,6 @@ func f() {
 }
 `,
 	},
-
 }
 
 func TestFixImports(t *testing.T) {
@@ -459,7 +458,7 @@ func TestFixImports(t *testing.T) {
 		"user":      "appengine/user",
 		"zip":       "archive/zip",
 		"bytes":     "bytes",
-		"snappy": "code.google.com/p/snappy-go/snappy",
+		"snappy":    "code.google.com/p/snappy-go/snappy",
 	}
 	findImport = func(pkgName string, symbols map[string]bool) (string, error) {
 		return simplePkgs[pkgName], nil
@@ -487,11 +486,13 @@ func TestFindImportGoPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(goroot)
-	bytesDir := filepath.Join(goroot, "src", "pkg", "bytes")
+	// Test against imaginary bits/bytes package in std lib
+	bytesDir := filepath.Join(goroot, "src", "pkg", "bits", "bytes")
 	if err := os.MkdirAll(bytesDir, 0755); err != nil {
 		t.Fatal(err)
 	}
 	bytesSrcPath := filepath.Join(bytesDir, "bytes.go")
+	bytesPkgPath := "bits/bytes"
 	bytesSrc := []byte(`package bytes
 
 type Buffer2 struct {}
@@ -512,8 +513,8 @@ type Buffer2 struct {}
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != "bytes" {
-		t.Errorf(`findImportGoPath("bytes", Buffer2 ...)=%q, want "bytes"`, got)
+	if got != bytesPkgPath {
+		t.Errorf(`findImportGoPath("bytes", Buffer2 ...)=%q, want "%s"`, got, bytesPkgPath)
 	}
 
 	got, err = findImportGoPath("bytes", map[string]bool{"Missing": true})
