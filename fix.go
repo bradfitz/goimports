@@ -41,6 +41,16 @@ func importGroup(importPath string) int {
 	return 0
 }
 
+func localName(importPath string) string {
+	importPath = strings.Trim(importPath, `\"`)
+	pkg, err := build.Import(importPath, ".", 0)
+	if err != nil {
+		// Fall back to trimming the path
+		return path.Base(importPath)
+	}
+	return pkg.Name
+}
+
 func fixImports(f *ast.File) (added []string, err error) {
 	// refs are a set of possible package references currently unsatisified by imports.
 	// first key: either base package (e.g. "fmt") or renamed package
@@ -61,7 +71,7 @@ func fixImports(f *ast.File) (added []string, err error) {
 			if v.Name != nil {
 				decls[v.Name.Name] = v
 			} else {
-				local := path.Base(strings.Trim(v.Path.Value, `\"`))
+				local := localName(v.Path.Value)
 				decls[local] = v
 			}
 		case *ast.SelectorExpr:
