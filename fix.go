@@ -7,7 +7,6 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -61,7 +60,11 @@ func fixImports(f *ast.File) (added []string, err error) {
 			if v.Name != nil {
 				decls[v.Name.Name] = v
 			} else {
-				local := path.Base(strings.Trim(v.Path.Value, `\"`))
+				//local := path.Base(strings.Trim(v.Path.Value, `\"`))
+				local := strings.Trim(v.Path.Value, `\"`)
+				if i := strings.LastIndexAny(local, ".-/\\"); i > 0 {
+					local = local[i+1:]
+				}
 				decls[local] = v
 			}
 		case *ast.SelectorExpr:

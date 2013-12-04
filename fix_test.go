@@ -447,6 +447,35 @@ func f() {
 }
 `,
 	},
+	{
+		name: "tes path include - or .",
+		in: `package main
+
+import (
+	"fmt"
+	"github.com/visualfc/go-ak"
+	"github.com/visualfc/go.ui"
+)
+
+func main() {
+	ak.Version()
+	fmt.Println("Hello World!", ak.Version(), ui.Version())
+}
+`,
+		out: `package main
+
+import (
+	"fmt"
+
+	"github.com/visualfc/go-ak"
+	"github.com/visualfc/go.ui"
+)
+
+func main() {
+	ak.Version()
+	fmt.Println("Hello World!", ak.Version(), ui.Version())
+}
+`},
 }
 
 func TestFixImports(t *testing.T) {
