@@ -5,50 +5,37 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"flag"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/printer"
 	"go/scanner"
-	"go/token"
 	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
-	"sync"
 
-	"code.google.com/p/go.tools/astutil"
+	"github.com/bradfitz/goimports/imports"
 )
 
 var (
 	// main operation modes
-	list      = flag.Bool("l", false, "list files whose formatting differs from goimport's")
-	write     = flag.Bool("w", false, "write result to (source) file instead of stdout")
-	doDiff    = flag.Bool("d", false, "display diffs instead of rewriting files")
-	allErrors = flag.Bool("e", false, "report all errors (not just the first 10 on different lines)")
+	list   = flag.Bool("l", false, "list files whose formatting differs from goimport's")
+	write  = flag.Bool("w", false, "write result to (source) file instead of stdout")
+	doDiff = flag.Bool("d", false, "display diffs instead of rewriting files")
 
-	// layout control
-	comments  = flag.Bool("comments", true, "print comments")
-	tabWidth  = flag.Int("tabwidth", 8, "tab width")
-	tabIndent = flag.Bool("tabs", true, "indent with tabs")
-)
-
-var (
-	fileSet  = token.NewFileSet() // per process FileSet
+	options  = &imports.Options{}
 	exitCode = 0
-
-	initModesOnce sync.Once // guards calling initModes
-	parserMode    parser.Mode
-	printerMode   printer.Mode
 )
+
+func init() {
+	flag.BoolVar(&options.AllErrors, "e", false, "report all errors (not just the first 10 on different lines)")
+	flag.BoolVar(&options.Comments, "comments", true, "print comments")
+	flag.IntVar(&options.TabWidth, "tabwidth", 8, "tab width")
+	flag.BoolVar(&options.TabIndent, "tabs", true, "indent with tabs")
+}
 
 func report(err error) {
 	scanner.PrintError(os.Stderr, err)
@@ -61,37 +48,19 @@ func usage() {
 	os.Exit(2)
 }
 
-func initModes() {
-	initParserMode()
-	initPrinterMode()
-}
-
-func initParserMode() {
-	parserMode = parser.Mode(0)
-	if *comments {
-		parserMode |= parser.ParseComments
-	}
-	if *allErrors {
-		parserMode |= parser.AllErrors
-	}
-}
-
-func initPrinterMode() {
-	printerMode = printer.UseSpaces
-	if *tabIndent {
-		printerMode |= printer.TabIndent
-	}
-}
-
 func isGoFile(f os.FileInfo) bool {
 	// ignore non-Go files
 	name := f.Name()
 	return !f.IsDir() && !strings.HasPrefix(name, ".") && strings.HasSuffix(name, ".go")
 }
 
-// If in == nil, the source is the contents of the file with the given filename.
 func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error {
-	initModesOnce.Do(initModes)
+	opt := options
+	if stdin {
+		nopt := *options
+		nopt.Fragment = true
+		opt = &nopt
+	}
 
 	if in == nil {
 		f, err := os.Open(filename)
@@ -107,45 +76,9 @@ func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error
 		return err
 	}
 
-	file, adjust, err := parse(fileSet, filename, src, stdin)
+	res, err := imports.Process(filename, src, opt)
 	if err != nil {
 		return err
-	}
-
-	_, err = fixImports(file)
-	if err != nil {
-		return err
-	}
-
-	sortImports(fileSet, file)
-	imps := astutil.Imports(fileSet, file)
-
-	var spacesBefore []string // import paths we need spaces before
-	if len(imps) == 1 {
-		// We have just one block of imports. See if any are in different groups numbers.
-		lastGroup := -1
-		for _, importSpec := range imps[0] {
-			importPath, _ := strconv.Unquote(importSpec.Path.Value)
-			groupNum := importGroup(importPath)
-			if groupNum != lastGroup && lastGroup != -1 {
-				spacesBefore = append(spacesBefore, importPath)
-			}
-			lastGroup = groupNum
-		}
-
-	}
-
-	var buf bytes.Buffer
-	err = (&printer.Config{Mode: printerMode, Tabwidth: *tabWidth}).Fprint(&buf, fileSet, file)
-	if err != nil {
-		return err
-	}
-	res := buf.Bytes()
-	if adjust != nil {
-		res = adjust(src, res)
-	}
-	if len(spacesBefore) > 0 {
-		res = addImportSpaces(bytes.NewReader(res), spacesBefore)
 	}
 
 	if !bytes.Equal(src, res) {
@@ -204,8 +137,8 @@ func gofmtMain() {
 	flag.Usage = usage
 	flag.Parse()
 
-	if *tabWidth < 0 {
-		fmt.Fprintf(os.Stderr, "negative tabwidth %d\n", *tabWidth)
+	if options.TabWidth < 0 {
+		fmt.Fprintf(os.Stderr, "negative tabwidth %d\n", options.TabWidth)
 		exitCode = 2
 		return
 	}
@@ -257,147 +190,4 @@ func diff(b1, b2 []byte) (data []byte, err error) {
 		err = nil
 	}
 	return
-
-}
-
-// parse parses src, which was read from filename,
-// as a Go source file or statement list.
-func parse(fset *token.FileSet, filename string, src []byte, stdin bool) (*ast.File, func(orig, src []byte) []byte, error) {
-	// Try as whole source file.
-	file, err := parser.ParseFile(fset, filename, src, parserMode)
-	if err == nil {
-		return file, nil, nil
-	}
-	// If the error is that the source file didn't begin with a
-	// package line and this is standard input, fall through to
-	// try as a source fragment.  Stop and return on any other error.
-	if !stdin || !strings.Contains(err.Error(), "expected 'package'") {
-		return nil, nil, err
-	}
-
-	// If this is a declaration list, make it a source file
-	// by inserting a package clause.
-	// Insert using a ;, not a newline, so that the line numbers
-	// in psrc match the ones in src.
-	psrc := append([]byte("package p;"), src...)
-	file, err = parser.ParseFile(fset, filename, psrc, parserMode)
-	if err == nil {
-		adjust := func(orig, src []byte) []byte {
-			// Remove the package clause.
-			// Gofmt has turned the ; into a \n.
-			src = src[len("package p\n"):]
-			return matchSpace(orig, src)
-		}
-		return file, adjust, nil
-	}
-	// If the error is that the source file didn't begin with a
-	// declaration, fall through to try as a statement list.
-	// Stop and return on any other error.
-	if !strings.Contains(err.Error(), "expected declaration") {
-		return nil, nil, err
-	}
-
-	// If this is a statement list, make it a source file
-	// by inserting a package clause and turning the list
-	// into a function body.  This handles expressions too.
-	// Insert using a ;, not a newline, so that the line numbers
-	// in fsrc match the ones in src.
-	fsrc := append(append([]byte("package p; func _() {"), src...), '}')
-	file, err = parser.ParseFile(fset, filename, fsrc, parserMode)
-	if err == nil {
-		adjust := func(orig, src []byte) []byte {
-			// Remove the wrapping.
-			// Gofmt has turned the ; into a \n\n.
-			src = src[len("package p\n\nfunc _() {"):]
-			src = src[:len(src)-len("}\n")]
-			// Gofmt has also indented the function body one level.
-			// Remove that indent.
-			src = bytes.Replace(src, []byte("\n\t"), []byte("\n"), -1)
-			return matchSpace(orig, src)
-		}
-		return file, adjust, nil
-	}
-
-	// Failed, and out of options.
-	return nil, nil, err
-}
-
-func cutSpace(b []byte) (before, middle, after []byte) {
-	i := 0
-	for i < len(b) && (b[i] == ' ' || b[i] == '\t' || b[i] == '\n') {
-		i++
-	}
-	j := len(b)
-	for j > 0 && (b[j-1] == ' ' || b[j-1] == '\t' || b[j-1] == '\n') {
-		j--
-	}
-	if i <= j {
-		return b[:i], b[i:j], b[j:]
-	}
-	return nil, nil, b[j:]
-}
-
-// matchSpace reformats src to use the same space context as orig.
-// 1) If orig begins with blank lines, matchSpace inserts them at the beginning of src.
-// 2) matchSpace copies the indentation of the first non-blank line in orig
-//    to every non-blank line in src.
-// 3) matchSpace copies the trailing space from orig and uses it in place
-//   of src's trailing space.
-func matchSpace(orig []byte, src []byte) []byte {
-	before, _, after := cutSpace(orig)
-	i := bytes.LastIndex(before, []byte{'\n'})
-	before, indent := before[:i+1], before[i+1:]
-
-	_, src, _ = cutSpace(src)
-
-	var b bytes.Buffer
-	b.Write(before)
-	for len(src) > 0 {
-		line := src
-		if i := bytes.IndexByte(line, '\n'); i >= 0 {
-			line, src = line[:i+1], line[i+1:]
-		} else {
-			src = nil
-		}
-		if len(line) > 0 && line[0] != '\n' { // not blank
-			b.Write(indent)
-		}
-		b.Write(line)
-	}
-	b.Write(after)
-	return b.Bytes()
-}
-
-var impLine = regexp.MustCompile(`^\s+(?:\w+\s+)?"(.+)"`)
-
-func addImportSpaces(r io.Reader, breaks []string) []byte {
-	var out bytes.Buffer
-	sc := bufio.NewScanner(r)
-	inImports := false
-	done := false
-	for sc.Scan() {
-		s := sc.Text()
-
-		if !inImports && !done && strings.HasPrefix(s, "import") {
-			inImports = true
-		}
-		if inImports && (strings.HasPrefix(s, "var") ||
-			strings.HasPrefix(s, "func") ||
-			strings.HasPrefix(s, "const") ||
-			strings.HasPrefix(s, "type")) {
-			done = true
-			inImports = false
-		}
-		if inImports && len(breaks) > 0 {
-			if m := impLine.FindStringSubmatch(s); m != nil {
-				if m[1] == string(breaks[0]) {
-					out.WriteByte('\n')
-					breaks = breaks[1:]
-				}
-			}
-		}
-
-		fmt.Fprintln(&out, s)
-	}
-	return out.Bytes()
 }

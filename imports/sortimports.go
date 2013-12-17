@@ -6,7 +6,7 @@
 
 // Hacked up copy of go/ast/import.go
 
-package main
+package imports
 
 import (
 	"go/ast"
