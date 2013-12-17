@@ -22,6 +22,9 @@ For vim, set "gofmt_command" to "goimports":
     https://code.google.com/p/go/source/browse#hg%2Fmisc%2Fvim
     etc
 
+For GoSublime, follow the steps described here:
+    http://mdwhatcott.wordpress.com/2013/12/15/installing-and-enabling-goimports-with-gosublime/
+
 For other editors, you probably know what to do.
 
 Happy hacking!
