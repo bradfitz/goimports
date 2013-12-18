@@ -1,7 +1,13 @@
 This tool updates your Go import lines, adding missing ones and
 removing unreferenced ones.
 
-     $ go get github.com/bradfitz/goimports
+     $ go get code.google.com/p/go.tools/cmd/goimports
+
+     Note the new location. This project has moved to the official
+     go.tools repo. Pull requests here will no longer be accepted.
+     Please use the Go process: http://golang.org/doc/contribute.html
+
+Old notes, still relevant, but unmaintained:
 
 It's a fork of gofmt, and will also format your code, so it can be
 used as a replacement for your gofmt-on-save hook in your editor of
