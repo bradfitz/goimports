@@ -24,9 +24,12 @@ Then in your .emacs file:
 
 For vim, set "gofmt_command" to "goimports":
 
+    let g:gofmt_command = "goimports"
+
     https://code.google.com/p/go/source/detail?r=39c724dd7f252
     https://code.google.com/p/go/source/browse#hg%2Fmisc%2Fvim
     etc
+
 
 For GoSublime, follow the steps described here:
     http://michaelwhatcott.com/gosublime-goimports/
