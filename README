@@ -1,7 +1,7 @@
 This tool updates your Go import lines, adding missing ones and
 removing unreferenced ones.
 
-     $ go get code.google.com/p/go.tools/cmd/goimports
+     $ go get golang.org/x/tools/cmd/goimports
 
      Note the new location. This project has moved to the official
      go.tools repo. Pull requests here will no longer be accepted.
@@ -12,6 +12,6 @@ formatting, also fixes imports.
 
 See usage and editor integration notes, now moved elsewhere:
 
-   http://godoc.org/code.google.com/p/go.tools/cmd/goimports
+   http://godoc.org/golang.org/x/tools/cmd/goimports
 
 Happy hacking!
