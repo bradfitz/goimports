@@ -20,6 +20,14 @@ import (
 	"golang.org/x/tools/imports"
 )
 
+const (
+	// clean blanks constants
+	importsBegin = "import ("
+	importsEnd   = ")"
+	crfl         = "\n"
+	blank        = crfl + crfl
+)
+
 var (
 	// main operation modes
 	list   = flag.Bool("l", false, "list files whose formatting differs from goimport's")
@@ -78,6 +86,8 @@ func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error
 		return err
 	}
 
+	src = cleanBlanks(src)
+
 	res, err := imports.Process(filename, src, opt)
 	if err != nil {
 		return err
@@ -109,6 +119,19 @@ func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error
 	}
 
 	return err
+}
+
+func cleanBlanks(src []byte) []byte {
+	begin := bytes.Index(src, []byte(importsBegin))
+	multiImports := begin > -1
+	if !multiImports {
+		return src
+	}
+
+	end := bytes.Index(src, []byte(importsEnd))
+	cleaned := bytes.ReplaceAll(src[begin:end], []byte(blank), []byte(crfl))
+	src = bytes.Replace(src, src[begin:end], cleaned, 1)
+	return src
 }
 
 func visitFile(path string, f os.FileInfo, err error) error {
