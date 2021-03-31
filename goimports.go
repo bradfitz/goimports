@@ -86,7 +86,9 @@ func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error
 		return err
 	}
 
-	src = cleanBlanks(src)
+	if *write {
+		src = cleanBlanks(src)
+	}
 
 	res, err := imports.Process(filename, src, opt)
 	if err != nil {

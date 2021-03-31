@@ -16,7 +16,7 @@ See usage and editor integration notes, now moved elsewhere:
    
 This specific fork of [bradfitz goimports](https://github.com/bradfitz/goimports), cleans all blank lines in imports block before formatting
 
-So, usually when an import is added by IDE it adds it at the top of the dependency block. Like this:
+So, usually when an import is added by the IDE it adds it at the top of the dependency block. Like this:
 ```
 import (
     "github.com/guyincogninto/costumes"
@@ -28,7 +28,7 @@ import (
 )
 ```
 
-Current go imports formats and leave it like this:
+Current go imports `-w` option formats and leave it like this:
 
 ```
 import (
@@ -42,7 +42,7 @@ import (
 )
 ```
 
-Maybe I'm a bit fussy, but it's not desirable for me. This fork will leave th thing like this:
+Maybe I'm a bit fussy, but it's not desirable for me. This fork will leave the thing like this:
 ```
 import (
     "bytes"
